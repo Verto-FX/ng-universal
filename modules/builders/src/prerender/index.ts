@@ -121,32 +121,40 @@ async function _renderUniversal(
       const spinner = ora(`Prerendering ${routes.length} route(s) to ${outputPath}...`).start();
 
       try {
-        const results = (await Promise.all(
-          routes.map((route) => {
-            const options: RenderOptions = {
-              indexFile,
-              deployUrl: browserOptions.deployUrl || '',
-              inlineCriticalCss: !!normalizedStylesOptimization.inlineCritical,
-              minifyCss: !!normalizedStylesOptimization.minify,
-              outputPath,
-              route,
-              serverBundlePath,
-            };
 
-            return worker.run(options, { name: 'render' });
-          }),
-        )) as RenderResult[];
-        let numErrors = 0;
-        for (const { errors, warnings } of results) {
-          spinner.stop();
-          errors?.forEach((e) => context.logger.error(e));
-          warnings?.forEach((e) => context.logger.warn(e));
-          spinner.start();
-          numErrors += errors?.length ?? 0;
+        let index = 0;
+        while (routes.length) {
+          console.log(`Rendering set ${++index}`)
+          const actionableRoutes = routes.splice(0, 10)
+          console.log(actionableRoutes)
+          const results = (await Promise.all(
+            routes.map((route) => {
+              const options: RenderOptions = {
+                indexFile,
+                deployUrl: browserOptions.deployUrl || '',
+                inlineCriticalCss: !!normalizedStylesOptimization.inlineCritical,
+                minifyCss: !!normalizedStylesOptimization.minify,
+                outputPath,
+                route,
+                serverBundlePath,
+              };
+
+              return worker.run(options, { name: 'render' });
+            }),
+          )) as RenderResult[];
+          let numErrors = 0;
+          for (const { errors, warnings } of results) {
+            spinner.stop();
+            errors?.forEach((e) => context.logger.error(e));
+            warnings?.forEach((e) => context.logger.warn(e));
+            spinner.start();
+            numErrors += errors?.length ?? 0;
+          }
+          if (numErrors > 0) {
+            throw Error(`Rendering failed with ${numErrors} worker errors.`);
+          }
         }
-        if (numErrors > 0) {
-          throw Error(`Rendering failed with ${numErrors} worker errors.`);
-        }
+
       } catch (error) {
         spinner.fail(`Prerendering routes to ${outputPath} failed.`);
 
